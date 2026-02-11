@@ -25,7 +25,6 @@ dev = [
 ]
 
 [project.scripts]
-maf-onedrive-integration = "maf_onedrive_integration.example_app:main"
 maf-onedrive-web = "maf_onedrive_integration.app:start"
 
 [build-system]
