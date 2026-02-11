@@ -1,0 +1,14 @@
+[project]
+name = "maf-onedrive-integration"
+version = "0.1.0"
+description = "MAF OneDrive Integration"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+maf-onedrive-integration = "maf_onedrive_integration.example_app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
