@@ -19,3 +19,9 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment
+.env
+
+# Downloads created by sample script
+downloads/
