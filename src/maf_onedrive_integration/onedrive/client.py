@@ -14,7 +14,7 @@ from msgraph import GraphServiceClient
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.folder import Folder
 
-from maf_onedrive_integration.onedrive.models import DriveItemInfo, FolderInfo
+from maf_onedrive_integration.onedrive.models import DriveItemInfo, FolderInfo, SiteInfo
 
 if TYPE_CHECKING:
     from azure.core.credentials import TokenCredential
@@ -76,8 +76,56 @@ class OneDriveClient:
             raise ValueError(msg)
 
     # ------------------------------------------------------------------
+    # User info
+    # ------------------------------------------------------------------
+
+    async def get_user_display_name(self) -> str:
+        """Return the authenticated user's display name from Microsoft Graph."""
+        user = await self._client.me.get()
+        if user is None or user.display_name is None:
+            return "User"
+        return user.display_name
+
+    # ------------------------------------------------------------------
     # Site / Drive helpers
     # ------------------------------------------------------------------
+
+    async def get_my_drive_id(self) -> str:
+        """Get the drive ID of the authenticated user's OneDrive."""
+        drive = await self._client.me.drive.get()
+        if drive is None or drive.id is None:
+            msg = "Could not resolve the current user's OneDrive drive ID."
+            raise FileNotFoundError(msg)
+        return drive.id
+
+    async def list_followed_sites(self) -> list[SiteInfo]:
+        """Return the SharePoint sites the current user is following."""
+        result = await self._client.me.followed_sites.get()
+        if result is None or result.value is None:
+            return []
+        return [
+            SiteInfo(
+                id=site.id or "",
+                name=site.name or "",
+                display_name=site.display_name or site.name or "",
+                web_url=site.web_url,
+            )
+            for site in result.value
+        ]
+
+    async def get_site_default_drive_id(self, site_id: str) -> str:
+        """Resolve the default document-library drive ID for a site by ID.
+
+        Parameters
+        ----------
+        site_id:
+            The site identifier (e.g. ``"contoso.sharepoint.com,guid,guid"``).
+        """
+        drive = await self._client.sites.by_site_id(site_id).drive.get()
+        if drive is None or drive.id is None:
+            msg = f"Default drive not found for site {site_id}"
+            raise FileNotFoundError(msg)
+        return drive.id
 
     async def get_site_drive_id(self, hostname: str, site_path: str) -> str:
         """Resolve the default document-library drive ID for a SharePoint site.

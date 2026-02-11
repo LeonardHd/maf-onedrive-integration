@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MAF OneDrive Browser</title>
+  <style>
+    :root {
+      --primary: #0078d4;
+      --primary-hover: #106ebe;
+      --bg: #f5f5f5;
+      --card-bg: #ffffff;
+      --text: #323130;
+      --text-muted: #605e5c;
+      --border: #e1dfdd;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    #user-area { display: flex; align-items: center; gap: 1rem; }
+    #user-area a {
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    #user-area a:hover { opacity: 1; text-decoration: underline; }
+
+    main {
+      max-width: 960px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    /* Login section */
+    #login-section {
+      text-align: center;
+      padding: 4rem 1rem;
+    }
+    #login-section p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      font-size: 1.05rem;
+    }
+    .btn {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      text-decoration: none;
+      padding: 0.65rem 1.5rem;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: var(--primary-hover); }
+
+    /* Breadcrumb */
+    #breadcrumb {
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    #breadcrumb a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    #breadcrumb a:hover { text-decoration: underline; }
+    #breadcrumb .sep { margin: 0 0.35rem; }
+
+    /* Drive selector */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .toolbar label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .toolbar select {
+      padding: 0.35rem 0.5rem;
+      font-size: 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--card-bg);
+      color: var(--text);
+      min-width: 220px;
+    }
+
+    /* File table */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: #faf9f8; }
+    th, td {
+      text-align: left;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f3f2f1; }
+
+    .file-name { display: flex; align-items: center; gap: 0.5rem; }
+    .file-name .icon { font-size: 1.1rem; }
+    .file-name a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .file-name a:hover { color: var(--primary); text-decoration: underline; }
+    .file-name a.folder { font-weight: 600; }
+
+    .size-col { width: 120px; }
+    .date-col { width: 180px; }
+
+    #empty-msg {
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    #error-msg {
+      padding: 1rem;
+      color: #a4262c;
+      background: #fde7e9;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .spinner {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OneDrive Browser</h1>
+    <div id="user-area" style="display: none;">
+      <span id="user-name"></span>
+      <a href="/logout">Sign out</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Login -->
+    <div id="login-section" style="display: none;">
+      <p>Sign in with your Microsoft account to browse your OneDrive files.</p>
+      <a href="/login" class="btn">Sign in with Microsoft</a>
+    </div>
+
+    <!-- Files -->
+    <div id="files-section" style="display: none;">
+      <div id="error-msg"></div>
+      <div class="toolbar">
+        <label for="drive-select">Location:</label>
+        <select id="drive-select">
+          <option value="" selected>My Drive</option>
+        </select>
+      </div>
+      <nav id="breadcrumb"></nav>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th class="size-col">Size</th>
+              <th class="date-col">Modified</th>
+            </tr>
+          </thead>
+          <tbody id="file-list"></tbody>
+        </table>
+        <div id="empty-msg" style="display: none;">This folder is empty.</div>
+        <div id="loading" class="spinner">Loading&hellip;</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const $login      = document.getElementById("login-section");
+    const $files      = document.getElementById("files-section");
+    const $userArea   = document.getElementById("user-area");
+    const $userName   = document.getElementById("user-name");
+    const $fileList   = document.getElementById("file-list");
+    const $breadcrumb = document.getElementById("breadcrumb");
+    const $loading    = document.getElementById("loading");
+    const $empty      = document.getElementById("empty-msg");
+    const $error      = document.getElementById("error-msg");
+    const $driveSel   = document.getElementById("drive-select");
+
+    let currentPath   = "";
+    let currentSiteId = "";  // empty = My Drive
+
+    /* ---- Helpers ---- */
+
+    function formatBytes(bytes) {
+      if (bytes == null) return "\u2014";
+      if (bytes === 0) return "0 B";
+      const k = 1024;
+      const sizes = ["B", "KB", "MB", "GB", "TB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "\u2014";
+      return new Date(iso).toLocaleDateString(undefined, {
+        year: "numeric", month: "short", day: "numeric"
+      });
+    }
+
+    /* ---- Drive selector ---- */
+
+    async function loadSites() {
+      try {
+        const res = await fetch("/api/sites");
+        if (!res.ok) return;
+        const sites = await res.json();
+        for (const site of sites) {
+          const opt = document.createElement("option");
+          opt.value = site.id;
+          opt.textContent = site.display_name || site.name;
+          $driveSel.appendChild(opt);
+        }
+      } catch { /* ignore — sites dropdown just won't be populated */ }
+    }
+
+    $driveSel.addEventListener("change", () => {
+      currentSiteId = $driveSel.value;
+      navigateTo("");
+    });
+
+    /* ---- Breadcrumb ---- */
+
+    function rootLabel() {
+      if (!currentSiteId) return "My Drive";
+      const opt = $driveSel.options[$driveSel.selectedIndex];
+      return opt ? opt.textContent : "Site";
+    }
+
+    function renderBreadcrumb(path) {
+      const parts = path ? path.split("/").filter(Boolean) : [];
+      let html = `<a href="#" data-path="">${rootLabel()}</a>`;
+      let cumulative = "";
+      for (const part of parts) {
+        cumulative += (cumulative ? "/" : "") + part;
+        html += '<span class="sep">/</span>';
+        html += `<a href="#" data-path="${cumulative}">${part}</a>`;
+      }
+      $breadcrumb.innerHTML = html;
+
+      $breadcrumb.querySelectorAll("a").forEach(a => {
+        a.addEventListener("click", e => {
+          e.preventDefault();
+          navigateTo(a.dataset.path);
+        });
+      });
+    }
+
+    /* ---- File list ---- */
+
+    function renderFiles(items) {
+      $fileList.innerHTML = "";
+      if (items.length === 0) {
+        $empty.style.display = "block";
+        return;
+      }
+      $empty.style.display = "none";
+
+      // Sort: folders first, then alphabetical
+      items.sort((a, b) => {
+        if (a.is_folder !== b.is_folder) return a.is_folder ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      for (const item of items) {
+        const tr = document.createElement("tr");
+        const icon = item.is_folder ? "\uD83D\uDCC1" : "\uD83D\uDCC4";
+        const cls  = item.is_folder ? "folder" : "";
+        const nameCell = item.is_folder
+          ? `<a href="#" class="${cls}" data-path="${currentPath ? currentPath + '/' : ''}${item.name}">${item.name}</a>`
+          : (item.web_url
+              ? `<a href="${item.web_url}" target="_blank" rel="noopener">${item.name}</a>`
+              : item.name);
+
+        tr.innerHTML = `
+          <td><div class="file-name"><span class="icon">${icon}</span>${nameCell}</div></td>
+          <td class="size-col">${item.is_folder ? "\u2014" : formatBytes(item.size)}</td>
+          <td class="date-col">${formatDate(item.modified_at)}</td>
+        `;
+        $fileList.appendChild(tr);
+      }
+
+      // Attach folder click handlers
+      $fileList.querySelectorAll("a.folder").forEach(a => {
+        a.addEventListener("click", e => {
+          e.preventDefault();
+          navigateTo(a.dataset.path);
+        });
+      });
+    }
+
+    /* ---- Navigation ---- */
+
+    async function navigateTo(path) {
+      currentPath = path;
+      $loading.style.display = "block";
+      $empty.style.display = "none";
+      $error.style.display = "none";
+      $fileList.innerHTML = "";
+      renderBreadcrumb(path);
+
+      const params = new URLSearchParams();
+      if (path) params.set("path", path);
+      if (currentSiteId) params.set("site_id", currentSiteId);
+
+      const qs = params.toString();
+      const url = "/api/files" + (qs ? "?" + qs : "");
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+        const items = await res.json();
+        renderFiles(items);
+      } catch (err) {
+        $error.textContent = "Error: " + err.message;
+        $error.style.display = "block";
+      } finally {
+        $loading.style.display = "none";
+      }
+    }
+
+    /* ---- Init ---- */
+
+    async function init() {
+      try {
+        const res = await fetch("/api/me");
+        if (res.ok) {
+          const data = await res.json();
+          $userName.textContent = data.name;
+          $userArea.style.display = "flex";
+          $files.style.display = "block";
+          await loadSites();
+          navigateTo("");
+        } else {
+          $login.style.display = "block";
+        }
+      } catch {
+        $login.style.display = "block";
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -37,3 +37,13 @@ class FolderInfo:
     name: str
     children: list[DriveItemInfo]
     web_url: str | None = None
+
+
+@dataclass(frozen=True)
+class SiteInfo:
+    """Represents metadata about a SharePoint site."""
+
+    id: str
+    name: str
+    display_name: str
+    web_url: str | None = None

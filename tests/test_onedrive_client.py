@@ -22,10 +22,6 @@ from maf_onedrive_integration.onedrive.models import DriveItemInfo
 if TYPE_CHECKING:
     from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_drive_item(
     *,
@@ -59,11 +55,6 @@ def _graph_client_mock() -> MagicMock:
     return MagicMock()
 
 
-# ---------------------------------------------------------------------------
-# Tests: __init__
-# ---------------------------------------------------------------------------
-
-
 class TestOneDriveClientInit:
     """Constructor validation."""
 
@@ -94,11 +85,6 @@ class TestOneDriveClientInit:
 
         # Assert
         mock_graph_cls.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# Tests: list_items
-# ---------------------------------------------------------------------------
 
 
 class TestListItems:
@@ -163,11 +149,6 @@ class TestListItems:
         assert result == []
 
 
-# ---------------------------------------------------------------------------
-# Tests: list_items_by_path
-# ---------------------------------------------------------------------------
-
-
 class TestListItemsByPath:
     """list_items_by_path resolves a folder, then lists children."""
 
@@ -214,11 +195,6 @@ class TestListItemsByPath:
             await client.list_items_by_path("drive-1", "nonexistent")
 
 
-# ---------------------------------------------------------------------------
-# Tests: get_item
-# ---------------------------------------------------------------------------
-
-
 class TestGetItem:
     @pytest.fixture()
     def client(self) -> OneDriveClient:
@@ -254,11 +230,6 @@ class TestGetItem:
         # Act & Assert
         with pytest.raises(FileNotFoundError, match="Item not found"):
             await client.get_item("drive-1", "missing")
-
-
-# ---------------------------------------------------------------------------
-# Tests: download_file
-# ---------------------------------------------------------------------------
 
 
 class TestDownloadFile:
@@ -325,11 +296,6 @@ class TestDownloadFile:
             await client.download_file("drive-1", "item-1", dest)
 
 
-# ---------------------------------------------------------------------------
-# Tests: upload_file_by_path
-# ---------------------------------------------------------------------------
-
-
 class TestUploadFileByPath:
     @pytest.fixture()
     def client(self) -> OneDriveClient:
@@ -369,11 +335,6 @@ class TestUploadFileByPath:
             await client.upload_file_by_path("drive-1", "f.txt", b"data")
 
 
-# ---------------------------------------------------------------------------
-# Tests: create_folder
-# ---------------------------------------------------------------------------
-
-
 class TestCreateFolder:
     @pytest.fixture()
     def client(self) -> OneDriveClient:
@@ -400,11 +361,6 @@ class TestCreateFolder:
         assert result.is_folder is True
 
 
-# ---------------------------------------------------------------------------
-# Tests: delete_item
-# ---------------------------------------------------------------------------
-
-
 class TestDeleteItem:
     @pytest.fixture()
     def client(self) -> OneDriveClient:
@@ -424,11 +380,6 @@ class TestDeleteItem:
 
         # Assert
         delete_mock.assert_awaited_once()
-
-
-# ---------------------------------------------------------------------------
-# Tests: get_site_drive_id
-# ---------------------------------------------------------------------------
 
 
 class TestGetSiteDriveId:
@@ -468,11 +419,6 @@ class TestGetSiteDriveId:
         # Act & Assert
         with pytest.raises(FileNotFoundError, match="Site not found"):
             await client.get_site_drive_id("contoso.sharepoint.com", "/sites/missing")
-
-
-# ---------------------------------------------------------------------------
-# Tests: models
-# ---------------------------------------------------------------------------
 
 
 class TestDriveItemInfo:

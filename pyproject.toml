@@ -9,12 +9,16 @@ dependencies = [
     "azure-identity>=1.15,<2",
     "azure-core>=1.30,<2",
     "python-dotenv>=1.0,<2",
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.34,<1",
+    "itsdangerous>=2.1,<3",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8,<9",
     "pytest-asyncio>=0.24,<1",
+    "httpx>=0.28,<1",
     "ruff>=0.9,<1",
     "ty>=0.0.1a6",
     "pre-commit>=4,<5",
@@ -22,14 +26,12 @@ dev = [
 
 [project.scripts]
 maf-onedrive-integration = "maf_onedrive_integration.example_app:main"
+maf-onedrive-web = "maf_onedrive_integration.app:start"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# ---------------------------------------------------------------------------
-# Ruff
-# ---------------------------------------------------------------------------
 [tool.ruff]
 target-version = "py312"
 line-length = 88
@@ -40,15 +42,9 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH", "RUF"]
 [tool.ruff.format]
 quote-style = "double"
 
-# ---------------------------------------------------------------------------
-# Pytest
-# ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
-# ---------------------------------------------------------------------------
-# ty (type checker)
-# ---------------------------------------------------------------------------
 [tool.ty.environment]
 python-version = "3.12"
