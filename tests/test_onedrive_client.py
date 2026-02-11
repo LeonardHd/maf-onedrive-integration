@@ -182,7 +182,7 @@ class TestListItemsByPath:
         folder = _make_drive_item(item_id="folder-1", name="Reports", is_folder=True)
         folder_get = AsyncMock(return_value=folder)
         (
-            client._client.drives.by_drive_id.return_value.root.item_with_path.return_value.get
+            client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.get
         ) = folder_get
 
         # Arrange — mock children
@@ -206,7 +206,7 @@ class TestListItemsByPath:
         # Arrange
         folder_get = AsyncMock(return_value=None)
         (
-            client._client.drives.by_drive_id.return_value.root.item_with_path.return_value.get
+            client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.get
         ) = folder_get
 
         # Act & Assert
@@ -342,7 +342,7 @@ class TestUploadFileByPath:
         uploaded = _make_drive_item(item_id="new-1", name="data.csv", size=999)
         put_mock = AsyncMock(return_value=uploaded)
         (
-            client._client.drives.by_drive_id.return_value.root.item_with_path.return_value.content.put
+            client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.content.put
         ) = put_mock
 
         # Act
@@ -361,7 +361,7 @@ class TestUploadFileByPath:
         # Arrange
         put_mock = AsyncMock(return_value=None)
         (
-            client._client.drives.by_drive_id.return_value.root.item_with_path.return_value.content.put
+            client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.content.put
         ) = put_mock
 
         # Act & Assert

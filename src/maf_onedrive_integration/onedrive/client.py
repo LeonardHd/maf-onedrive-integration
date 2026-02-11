@@ -137,7 +137,9 @@ class OneDriveClient:
         """
         # Resolve the folder first, then list children.
         folder_item = await (
-            self._client.drives.by_drive_id(drive_id).root.item_with_path(path).get()
+            self._client.drives.by_drive_id(drive_id)
+            .items.by_drive_item_id(f"root:/{path}:")
+            .get()
         )
         if folder_item is None:
             msg = f"Folder not found at path: {path}"
@@ -271,7 +273,7 @@ class OneDriveClient:
         """
         result: DriveItem | None = await (
             self._client.drives.by_drive_id(drive_id)
-            .root.item_with_path(remote_path)
+            .items.by_drive_item_id(f"root:/{remote_path}:")
             .content.put(content)
         )
         if result is None:
