@@ -12,6 +12,7 @@ from httpx import ASGITransport, AsyncClient
 import maf_onedrive_integration.app as app_module
 from maf_onedrive_integration.app import app
 from maf_onedrive_integration.onedrive.models import DriveItemInfo, SiteInfo
+from maf_onedrive_integration.summary_agent.agent import SummaryResult
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -441,3 +442,221 @@ class TestApiSites:
         # Assert
         assert response.status_code == 502
         assert response.json()["error"] == "Failed to list sites"
+
+
+class TestApiSummarize:
+    async def test_unauthenticated_returns_401(self) -> None:
+        # Arrange
+        transport = ASGITransport(app=app)
+
+        # Act
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/api/summarize?item_id=x")
+
+        # Assert
+        assert response.status_code == 401
+
+    @patch("maf_onedrive_integration.app.OneDriveClient")
+    @patch("maf_onedrive_integration.app.AuthorizationCodeCredential")
+    async def test_missing_item_id_returns_400(
+        self, mock_cred_cls: MagicMock, mock_client_cls: MagicMock
+    ) -> None:
+        # Arrange
+        mock_cred_cls.return_value = _login_mocks()
+        mock_client = AsyncMock()
+        mock_client.get_user_display_name.return_value = "User"
+        mock_client_cls.return_value = mock_client
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.get("/auth/callback?code=c")
+
+            # Act
+            response = await client.post("/api/summarize")
+
+        # Assert
+        assert response.status_code == 400
+        assert response.json()["error"] == "item_id is required"
+
+    @patch("maf_onedrive_integration.app.summarize_file_content")
+    @patch("maf_onedrive_integration.app.OneDriveClient")
+    @patch("maf_onedrive_integration.app.AuthorizationCodeCredential")
+    async def test_successful_summary(
+        self,
+        mock_cred_cls: MagicMock,
+        mock_client_cls: MagicMock,
+        mock_summarize: AsyncMock,
+    ) -> None:
+        # Arrange
+        mock_cred_cls.return_value = _login_mocks()
+
+        mock_client = AsyncMock()
+        mock_client._client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.get_user_display_name.return_value = "User"
+        mock_client.get_my_drive_id.return_value = "drive-1"
+        mock_client.get_item.return_value = DriveItemInfo(
+            id="file-1", name="report.pdf", size=1024
+        )
+        (
+            mock_client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.content.get
+        ) = AsyncMock(return_value=b"PDF-BYTES")
+
+        mock_summarize.return_value = SummaryResult(
+            success=True, summary="This is a summary."
+        )
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.get("/auth/callback?code=c")
+
+            # Act
+            response = await client.post("/api/summarize?item_id=file-1")
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["summary"] == "This is a summary."
+        mock_summarize.assert_called_once_with(b"PDF-BYTES", "report.pdf")
+
+    @patch("maf_onedrive_integration.app.summarize_file_content")
+    @patch("maf_onedrive_integration.app.OneDriveClient")
+    @patch("maf_onedrive_integration.app.AuthorizationCodeCredential")
+    async def test_summary_agent_error_returns_422(
+        self,
+        mock_cred_cls: MagicMock,
+        mock_client_cls: MagicMock,
+        mock_summarize: AsyncMock,
+    ) -> None:
+        # Arrange
+        mock_cred_cls.return_value = _login_mocks()
+
+        mock_client = AsyncMock()
+        mock_client._client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.get_user_display_name.return_value = "User"
+        mock_client.get_my_drive_id.return_value = "drive-1"
+        mock_client.get_item.return_value = DriveItemInfo(
+            id="file-1", name="image.bmp", size=512
+        )
+        (
+            mock_client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.content.get
+        ) = AsyncMock(return_value=b"BMP-BYTES")
+
+        mock_summarize.return_value = SummaryResult(
+            success=False, error="Could not convert 'image.bmp' to Markdown."
+        )
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.get("/auth/callback?code=c")
+
+            # Act
+            response = await client.post("/api/summarize?item_id=file-1")
+
+        # Assert
+        assert response.status_code == 422
+        assert "Could not convert" in response.json()["error"]
+
+    @patch("maf_onedrive_integration.app.OneDriveClient")
+    @patch("maf_onedrive_integration.app.AuthorizationCodeCredential")
+    async def test_download_failure_returns_502(
+        self, mock_cred_cls: MagicMock, mock_client_cls: MagicMock
+    ) -> None:
+        # Arrange
+        mock_cred_cls.return_value = _login_mocks()
+
+        call_count = 0
+        mock_client = AsyncMock()
+        mock_client.get_user_display_name.return_value = "User"
+
+        def make_client(**kwargs: object) -> AsyncMock:
+            nonlocal call_count
+            call_count += 1
+            if call_count > 1:
+                mock_client.get_my_drive_id.side_effect = RuntimeError("Graph API down")
+            return mock_client
+
+        mock_client_cls.side_effect = make_client
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.get("/auth/callback?code=c")
+
+            # Act
+            response = await client.post("/api/summarize?item_id=file-1")
+
+        # Assert
+        assert response.status_code == 502
+        assert response.json()["error"] == "Failed to download the file"
+
+    @patch("maf_onedrive_integration.app.OneDriveClient")
+    @patch("maf_onedrive_integration.app.AuthorizationCodeCredential")
+    async def test_no_content_returns_502(
+        self, mock_cred_cls: MagicMock, mock_client_cls: MagicMock
+    ) -> None:
+        # Arrange
+        mock_cred_cls.return_value = _login_mocks()
+
+        mock_client = AsyncMock()
+        mock_client._client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.get_user_display_name.return_value = "User"
+        mock_client.get_my_drive_id.return_value = "drive-1"
+        mock_client.get_item.return_value = DriveItemInfo(
+            id="file-1", name="empty.pdf", size=0
+        )
+        (
+            mock_client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.content.get
+        ) = AsyncMock(return_value=None)
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.get("/auth/callback?code=c")
+
+            # Act
+            response = await client.post("/api/summarize?item_id=file-1")
+
+        # Assert
+        assert response.status_code == 502
+        assert "no downloadable content" in response.json()["error"]
+
+    @patch("maf_onedrive_integration.app.summarize_file_content")
+    @patch("maf_onedrive_integration.app.OneDriveClient")
+    @patch("maf_onedrive_integration.app.AuthorizationCodeCredential")
+    async def test_uses_site_id_to_resolve_drive(
+        self,
+        mock_cred_cls: MagicMock,
+        mock_client_cls: MagicMock,
+        mock_summarize: AsyncMock,
+    ) -> None:
+        # Arrange
+        mock_cred_cls.return_value = _login_mocks()
+
+        mock_client = AsyncMock()
+        mock_client._client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.get_user_display_name.return_value = "User"
+        mock_client.get_site_default_drive_id.return_value = "site-drive-1"
+        mock_client.get_item.return_value = DriveItemInfo(
+            id="file-s1", name="notes.txt", size=100
+        )
+        (
+            mock_client._client.drives.by_drive_id.return_value.items.by_drive_item_id.return_value.content.get
+        ) = AsyncMock(return_value=b"TXT-BYTES")
+
+        mock_summarize.return_value = SummaryResult(
+            success=True, summary="Notes summary."
+        )
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await client.get("/auth/callback?code=c")
+
+            # Act
+            response = await client.post(
+                "/api/summarize?item_id=file-s1&site_id=site-abc"
+            )
+
+        # Assert
+        assert response.status_code == 200
+        mock_client.get_site_default_drive_id.assert_called_once_with("site-abc")

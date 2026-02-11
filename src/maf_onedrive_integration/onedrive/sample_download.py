@@ -30,9 +30,7 @@ logger = logging.getLogger(__name__)
 
 async def main() -> None:
     """Entry point for the sample download script."""
-    # ------------------------------------------------------------------ #
-    # 1. Load configuration from .env
-    # ------------------------------------------------------------------ #
+
     load_dotenv()
 
     hostname = os.environ.get("SHAREPOINT_HOSTNAME", "")
@@ -44,9 +42,6 @@ async def main() -> None:
         logger.error("SHAREPOINT_HOSTNAME and SHAREPOINT_SITE_PATH must be set in .env")
         sys.exit(1)
 
-    # ------------------------------------------------------------------ #
-    # 2. Authenticate with DefaultAzureCredential
-    # ------------------------------------------------------------------ #
     from azure.identity.aio import DefaultAzureCredential
 
     from maf_onedrive_integration.onedrive.client import OneDriveClient
@@ -55,16 +50,10 @@ async def main() -> None:
     client = OneDriveClient(credential=credential)
 
     try:
-        # -------------------------------------------------------------- #
-        # 3. Resolve the drive ID of the SharePoint site
-        # -------------------------------------------------------------- #
         logger.info("Resolving drive for %s%s …", hostname, site_path)
         drive_id = await client.get_site_drive_id(hostname, site_path)
         logger.info("Drive ID: %s", drive_id)
 
-        # -------------------------------------------------------------- #
-        # 4. List files in the target folder
-        # -------------------------------------------------------------- #
         if folder_path:
             logger.info("Listing files in /%s …", folder_path)
             items = await client.list_items_by_path(drive_id, folder_path)
@@ -81,9 +70,6 @@ async def main() -> None:
             logger.info("Nothing to download.")
             return
 
-        # -------------------------------------------------------------- #
-        # 5. Download each file
-        # -------------------------------------------------------------- #
         download_dir.mkdir(parents=True, exist_ok=True)
         for f in files:
             dest = await client.download_file(drive_id, f.id, download_dir)

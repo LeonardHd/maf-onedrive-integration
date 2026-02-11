@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from maf_onedrive_integration.onedrive.client import OneDriveClient
+from maf_onedrive_integration.summary_agent.agent import summarize_file_content
 
 if TYPE_CHECKING:
     from starlette.responses import Response
@@ -215,6 +216,65 @@ async def list_files(
             for item in items
         ]
     )
+
+
+@app.post("/api/summarize")
+async def summarize(
+    request: Request,
+    drive_id: str = "",
+    item_id: str = "",
+    site_id: str = "",
+) -> JSONResponse:
+    """Download a file and return an AI-generated summary.
+
+    Query Parameters
+    ----------------
+    drive_id:
+        Optional drive ID.  When omitted the user's personal OneDrive is used.
+    item_id:
+        The ID of the file to summarise.
+    site_id:
+        Optional SharePoint site ID.  Resolves the site's default drive.
+        Ignored when *drive_id* is provided.
+    """
+    credential = _get_credential(request)
+    if not credential:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    if not item_id:
+        return JSONResponse({"error": "item_id is required"}, status_code=400)
+
+    client = OneDriveClient(credential=credential)
+
+    try:
+        # Resolve the drive.
+        if drive_id:
+            resolved_drive_id = drive_id
+        elif site_id:
+            resolved_drive_id = await client.get_site_default_drive_id(site_id)
+        else:
+            resolved_drive_id = await client.get_my_drive_id()
+
+        # Get file metadata (for the filename) and download content.
+        meta = await client.get_item(resolved_drive_id, item_id)
+        content: bytes | None = await (
+            client._client.drives.by_drive_id(resolved_drive_id)
+            .items.by_drive_item_id(item_id)
+            .content.get()
+        )
+        if content is None:
+            return JSONResponse(
+                {"error": "File has no downloadable content"},
+                status_code=502,
+            )
+    except Exception:
+        logger.exception("Failed to download file for summarization")
+        return JSONResponse({"error": "Failed to download the file"}, status_code=502)
+
+    result = await summarize_file_content(content, meta.name)
+    if result.success:
+        return JSONResponse({"summary": result.summary})
+    return JSONResponse({"error": result.error}, status_code=422)
 
 
 def start() -> None:

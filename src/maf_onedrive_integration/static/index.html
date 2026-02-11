@@ -156,6 +156,75 @@
       padding: 2rem;
       color: var(--text-muted);
     }
+
+    /* Summary button */
+    .actions-col { width: 100px; text-align: center; }
+    .btn-summary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-summary:hover { background: var(--primary-hover); }
+    .btn-summary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Summary modal */
+    #summary-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #summary-overlay.active { display: flex; }
+    #summary-modal {
+      background: var(--card-bg);
+      border-radius: 8px;
+      width: 600px;
+      max-width: 90vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    }
+    #summary-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    #summary-modal-body {
+      padding: 1rem;
+      overflow-y: auto;
+      flex: 1;
+      white-space: pre-wrap;
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+    #summary-modal-close {
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+    .summary-error {
+      color: #a4262c;
+      background: #fde7e9;
+      padding: 0.75rem;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -191,6 +260,7 @@
               <th>Name</th>
               <th class="size-col">Size</th>
               <th class="date-col">Modified</th>
+              <th class="actions-col">Actions</th>
             </tr>
           </thead>
           <tbody id="file-list"></tbody>
@@ -200,6 +270,17 @@
       </div>
     </div>
   </main>
+
+  <!-- Summary modal -->
+  <div id="summary-overlay">
+    <div id="summary-modal">
+      <div id="summary-modal-header">
+        <span id="summary-modal-title">Summary</span>
+        <button id="summary-modal-close">&times;</button>
+      </div>
+      <div id="summary-modal-body"></div>
+    </div>
+  </div>
 
   <script>
     const $login      = document.getElementById("login-section");
@@ -212,9 +293,44 @@
     const $empty      = document.getElementById("empty-msg");
     const $error      = document.getElementById("error-msg");
     const $driveSel   = document.getElementById("drive-select");
+    const $overlay    = document.getElementById("summary-overlay");
+    const $modalTitle = document.getElementById("summary-modal-title");
+    const $modalBody  = document.getElementById("summary-modal-body");
+    const $modalClose = document.getElementById("summary-modal-close");
 
     let currentPath   = "";
     let currentSiteId = "";  // empty = My Drive
+
+    /* ---- Summary modal ---- */
+
+    $modalClose.addEventListener("click", () => {
+      $overlay.classList.remove("active");
+    });
+    $overlay.addEventListener("click", (e) => {
+      if (e.target === $overlay) $overlay.classList.remove("active");
+    });
+
+    async function requestSummary(itemId, fileName) {
+      $modalTitle.textContent = "Summary — " + fileName;
+      $modalBody.innerHTML = '<div class="spinner">Generating summary…</div>';
+      $overlay.classList.add("active");
+
+      const params = new URLSearchParams();
+      params.set("item_id", itemId);
+      if (currentSiteId) params.set("site_id", currentSiteId);
+
+      try {
+        const res = await fetch("/api/summarize?" + params.toString(), { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+          $modalBody.textContent = data.summary;
+        } else {
+          $modalBody.innerHTML = '<div class="summary-error">' + (data.error || "Unknown error") + '</div>';
+        }
+      } catch (err) {
+        $modalBody.innerHTML = '<div class="summary-error">Request failed: ' + err.message + '</div>';
+      }
+    }
 
     /* ---- Helpers ---- */
 
@@ -308,10 +424,15 @@
               ? `<a href="${item.web_url}" target="_blank" rel="noopener">${item.name}</a>`
               : item.name);
 
+        const actionsCell = item.is_folder
+          ? '\u2014'
+          : `<button class="btn-summary" data-item-id="${item.id}" data-file-name="${item.name}">Summarize</button>`;
+
         tr.innerHTML = `
           <td><div class="file-name"><span class="icon">${icon}</span>${nameCell}</div></td>
           <td class="size-col">${item.is_folder ? "\u2014" : formatBytes(item.size)}</td>
           <td class="date-col">${formatDate(item.modified_at)}</td>
+          <td class="actions-col">${actionsCell}</td>
         `;
         $fileList.appendChild(tr);
       }
@@ -321,6 +442,13 @@
         a.addEventListener("click", e => {
           e.preventDefault();
           navigateTo(a.dataset.path);
+        });
+      });
+
+      // Attach summary button handlers
+      $fileList.querySelectorAll(".btn-summary").forEach(btn => {
+        btn.addEventListener("click", () => {
+          requestSummary(btn.dataset.itemId, btn.dataset.fileName);
         });
       });
     }

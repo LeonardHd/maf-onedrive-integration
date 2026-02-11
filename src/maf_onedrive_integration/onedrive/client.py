@@ -75,20 +75,12 @@ class OneDriveClient:
             msg = "Either 'credential' or 'graph_client' must be provided."
             raise ValueError(msg)
 
-    # ------------------------------------------------------------------
-    # User info
-    # ------------------------------------------------------------------
-
     async def get_user_display_name(self) -> str:
         """Return the authenticated user's display name from Microsoft Graph."""
         user = await self._client.me.get()
         if user is None or user.display_name is None:
             return "User"
         return user.display_name
-
-    # ------------------------------------------------------------------
-    # Site / Drive helpers
-    # ------------------------------------------------------------------
 
     async def get_my_drive_id(self) -> str:
         """Get the drive ID of the authenticated user's OneDrive."""
@@ -147,10 +139,6 @@ class OneDriveClient:
             msg = f"Default drive not found for site {hostname}:{site_path}"
             raise FileNotFoundError(msg)
         return drive.id or ""
-
-    # ------------------------------------------------------------------
-    # List / Read
-    # ------------------------------------------------------------------
 
     async def list_items(
         self, drive_id: str, folder_id: str = "root"
@@ -214,10 +202,6 @@ class OneDriveClient:
             raise FileNotFoundError(msg)
         return _to_drive_item_info(item)
 
-    # ------------------------------------------------------------------
-    # Download
-    # ------------------------------------------------------------------
-
     async def download_file(
         self,
         drive_id: str,
@@ -261,10 +245,6 @@ class OneDriveClient:
         destination.write_bytes(content)
         logger.info("Downloaded %s to %s", item_id, destination)
         return destination
-
-    # ------------------------------------------------------------------
-    # Upload
-    # ------------------------------------------------------------------
 
     async def upload_file(
         self,
@@ -329,10 +309,6 @@ class OneDriveClient:
             raise RuntimeError(msg)
         return _to_drive_item_info(result)
 
-    # ------------------------------------------------------------------
-    # Create folder
-    # ------------------------------------------------------------------
-
     async def create_folder(
         self,
         drive_id: str,
@@ -365,10 +341,6 @@ class OneDriveClient:
             raise RuntimeError(msg)
         return _to_drive_item_info(result)
 
-    # ------------------------------------------------------------------
-    # Delete
-    # ------------------------------------------------------------------
-
     async def delete_item(self, drive_id: str, item_id: str) -> None:
         """Delete a file or folder (moves it to the recycle bin).
 
@@ -385,10 +357,6 @@ class OneDriveClient:
             .delete()
         )
         logger.info("Deleted item %s from drive %s", item_id, drive_id)
-
-    # ------------------------------------------------------------------
-    # Convenience
-    # ------------------------------------------------------------------
 
     async def get_folder_info(
         self, drive_id: str, folder_id: str = "root"
