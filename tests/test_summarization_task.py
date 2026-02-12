@@ -1,4 +1,4 @@
-"""Tests for the summary agent."""
+"""Tests for the summarization task."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from maf_onedrive_integration.summary_agent.agent import (
+from maf_onedrive_integration.summarization_task.task import (
     SummaryResult,
-    _build_agent,
+    _build_chat_client,
     _extension,
     convert_to_markdown,
     summarize_file_content,
@@ -31,7 +31,7 @@ class TestExtension:
 class TestConvertToMarkdown:
     """convert_to_markdown wraps markitdown."""
 
-    @patch("maf_onedrive_integration.summary_agent.agent.MarkItDown")
+    @patch("maf_onedrive_integration.summarization_task.task.MarkItDown")
     def test_returns_markdown_text(self, mock_md_cls: MagicMock) -> None:
         # Arrange
         mock_result = MagicMock()
@@ -47,7 +47,7 @@ class TestConvertToMarkdown:
         assert text == "# Title\nSome content"
         mock_md.convert_stream.assert_called_once()
 
-    @patch("maf_onedrive_integration.summary_agent.agent.MarkItDown")
+    @patch("maf_onedrive_integration.summarization_task.task.MarkItDown")
     def test_raises_when_no_text_produced(self, mock_md_cls: MagicMock) -> None:
         # Arrange
         mock_result = MagicMock()
@@ -60,7 +60,7 @@ class TestConvertToMarkdown:
         with pytest.raises(ValueError, match="markitdown produced no text"):
             convert_to_markdown(b"raw bytes", "empty.bin")
 
-    @patch("maf_onedrive_integration.summary_agent.agent.MarkItDown")
+    @patch("maf_onedrive_integration.summarization_task.task.MarkItDown")
     def test_raises_when_text_content_is_none(self, mock_md_cls: MagicMock) -> None:
         # Arrange
         mock_result = MagicMock()
@@ -74,20 +74,20 @@ class TestConvertToMarkdown:
             convert_to_markdown(b"raw bytes", "nothing.xyz")
 
 
-class TestBuildAgent:
-    """_build_agent constructs a ChatAgent with OpenAIChatClient."""
+class TestBuildChatClient:
+    """_build_chat_client constructs a ChatAgent with OpenAIChatClient."""
 
     @patch.dict(
         "os.environ",
         {"GITHUB_TOKEN": "ghp_test123", "GITHUB_MODELS_MODEL_ID": "gpt-4o"},
     )
-    @patch("maf_onedrive_integration.summary_agent.agent.ChatAgent")
-    @patch("maf_onedrive_integration.summary_agent.agent.OpenAIChatClient")
-    def test_builds_agent_with_env_vars(
-        self, mock_client_cls: MagicMock, mock_agent_cls: MagicMock
+    @patch("maf_onedrive_integration.summarization_task.task.ChatAgent")
+    @patch("maf_onedrive_integration.summarization_task.task.OpenAIChatClient")
+    def test_builds_with_env_vars(
+        self, mock_client_cls: MagicMock, mock_chat_cls: MagicMock
     ) -> None:
         # Act
-        _build_agent()
+        _build_chat_client()
 
         # Assert
         mock_client_cls.assert_called_once_with(
@@ -95,15 +95,15 @@ class TestBuildAgent:
             api_key="ghp_test123",
             base_url="https://models.inference.ai.azure.com",
         )
-        mock_agent_cls.assert_called_once()
-        call_kwargs = mock_agent_cls.call_args
-        assert call_kwargs.kwargs["name"] == "SummaryAgent"
+        mock_chat_cls.assert_called_once()
+        call_kwargs = mock_chat_cls.call_args
+        assert call_kwargs.kwargs["name"] == "Summarizer"
 
     @patch.dict("os.environ", {}, clear=False)
-    @patch("maf_onedrive_integration.summary_agent.agent.ChatAgent")
-    @patch("maf_onedrive_integration.summary_agent.agent.OpenAIChatClient")
+    @patch("maf_onedrive_integration.summarization_task.task.ChatAgent")
+    @patch("maf_onedrive_integration.summarization_task.task.OpenAIChatClient")
     def test_defaults_when_env_vars_missing(
-        self, mock_client_cls: MagicMock, mock_agent_cls: MagicMock
+        self, mock_client_cls: MagicMock, mock_chat_cls: MagicMock
     ) -> None:
         # Arrange — remove env vars if present
         import os
@@ -112,7 +112,7 @@ class TestBuildAgent:
         os.environ.pop("GITHUB_MODELS_MODEL_ID", None)
 
         # Act
-        _build_agent()
+        _build_chat_client()
 
         # Assert
         mock_client_cls.assert_called_once_with(
@@ -125,8 +125,8 @@ class TestBuildAgent:
 class TestSummarizeFileContent:
     """End-to-end summarize_file_content tests."""
 
-    @patch("maf_onedrive_integration.summary_agent.agent._build_agent")
-    @patch("maf_onedrive_integration.summary_agent.agent.convert_to_markdown")
+    @patch("maf_onedrive_integration.summarization_task.task._build_chat_client")
+    @patch("maf_onedrive_integration.summarization_task.task.convert_to_markdown")
     async def test_success(
         self,
         mock_convert: MagicMock,
@@ -150,7 +150,7 @@ class TestSummarizeFileContent:
         mock_convert.assert_called_once_with(b"file-bytes", "report.pdf")
         mock_agent.run.assert_called_once()
 
-    @patch("maf_onedrive_integration.summary_agent.agent.convert_to_markdown")
+    @patch("maf_onedrive_integration.summarization_task.task.convert_to_markdown")
     async def test_conversion_failure_returns_error(
         self,
         mock_convert: MagicMock,
@@ -166,8 +166,8 @@ class TestSummarizeFileContent:
         assert result.error is not None
         assert "Could not convert" in result.error
 
-    @patch("maf_onedrive_integration.summary_agent.agent._build_agent")
-    @patch("maf_onedrive_integration.summary_agent.agent.convert_to_markdown")
+    @patch("maf_onedrive_integration.summarization_task.task._build_chat_client")
+    @patch("maf_onedrive_integration.summarization_task.task.convert_to_markdown")
     async def test_llm_failure_returns_error(
         self,
         mock_convert: MagicMock,

@@ -1,46 +1,54 @@
-"""Sample script: authenticate with DefaultAzureCredential and download files.
+"""Sample script: download files from a SharePoint site.
 
 Usage::
 
-    # 1. Copy .env.example to .env and fill in real values.
-    # 2. Ensure you have valid Azure credentials
+    # 1. Ensure you have valid Azure credentials
     #    (e.g. ``az login`` or environment variables).
-    # 3. Run:
+    # 2. Run:
     #        python -m maf_onedrive_integration.onedrive.sample_download
 
 The script will:
-  1. Resolve the default drive for the configured SharePoint site.
-  2. List all files in the specified folder.
-  3. Download every file to a local directory.
+  1. Prompt for the SharePoint hostname and site path.
+  2. Optionally prompt for a folder path within the document library.
+  3. Download every file to a local ``./downloads`` directory.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import sys
 from pathlib import Path
-
-from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
+
+DOWNLOAD_DIR = Path("./downloads")
+
+
+def _prompt(label: str, default: str = "") -> str:
+    """Prompt the user for input, showing a default value if available."""
+    if default:
+        value = input(f"{label} [{default}]: ").strip()
+        return value or default
+    while True:
+        value = input(f"{label}: ").strip()
+        if value:
+            return value
+        print(f"  ⚠  {label} is required.")
 
 
 async def main() -> None:
     """Entry point for the sample download script."""
 
-    load_dotenv()
+    print("\n── SharePoint / OneDrive download sample ──\n")
 
-    hostname = os.environ.get("SHAREPOINT_HOSTNAME", "")
-    site_path = os.environ.get("SHAREPOINT_SITE_PATH", "")
-    folder_path = os.environ.get("ONEDRIVE_FOLDER_PATH", "")
-    download_dir = Path(os.environ.get("DOWNLOAD_DIR", "./downloads"))
-
-    if not hostname or not site_path:
-        logger.error("SHAREPOINT_HOSTNAME and SHAREPOINT_SITE_PATH must be set in .env")
-        sys.exit(1)
+    hostname = _prompt("SharePoint hostname (e.g. contoso.sharepoint.com)")
+    if "." not in hostname:
+        hostname = f"{hostname}.sharepoint.com"
+    site_path = _prompt("Site path (e.g. /sites/my-team)")
+    if not site_path.startswith("/"):
+        site_path = f"/{site_path}"
+    folder_path = input("Folder path (leave empty for root): ").strip()
 
     from azure.identity.aio import DefaultAzureCredential
 
@@ -70,12 +78,12 @@ async def main() -> None:
             logger.info("Nothing to download.")
             return
 
-        download_dir.mkdir(parents=True, exist_ok=True)
+        DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
         for f in files:
-            dest = await client.download_file(drive_id, f.id, download_dir)
+            dest = await client.download_file(drive_id, f.id, DOWNLOAD_DIR)
             logger.info("  ✓ Saved %s", dest)
 
-        logger.info("Done - %d file(s) downloaded to %s", len(files), download_dir)
+        logger.info("Done - %d file(s) downloaded to %s", len(files), DOWNLOAD_DIR)
 
     finally:
         await credential.close()

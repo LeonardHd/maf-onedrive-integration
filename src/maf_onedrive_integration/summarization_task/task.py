@@ -1,4 +1,4 @@
-"""Summary agent powered by Microsoft Agent Framework + GitHub Models.
+"""Summarization task powered by Microsoft Agent Framework + GitHub Models.
 
 This module provides a single high-level coroutine, ``summarize_file_content``,
 that:
@@ -44,8 +44,8 @@ class SummaryResult:
     error: str | None = None
 
 
-def _build_agent() -> ChatAgent:
-    """Create and return a configured Agent Framework agent."""
+def _build_chat_client() -> ChatAgent:
+    """Create and return a configured ChatAgent for summarization."""
     token = os.environ.get("GITHUB_TOKEN", "")
     model_id = os.environ.get("GITHUB_MODELS_MODEL_ID", _DEFAULT_MODEL_ID)
 
@@ -57,7 +57,7 @@ def _build_agent() -> ChatAgent:
 
     return ChatAgent(
         chat_client=client,
-        name="SummaryAgent",
+        name="Summarizer",
         instructions=_SYSTEM_INSTRUCTIONS,
     )
 
@@ -121,14 +121,14 @@ async def summarize_file_content(
             "The file format may not be supported by markitdown.",
         )
 
-    # Step 2 — summarise via the agent
+    # Step 2 — summarise via the LLM
     try:
-        agent = _build_agent()
+        chat = _build_chat_client()
         prompt = (
             f"Please summarise the following document (filename: {filename}):\n\n"
             f"{markdown_text}"
         )
-        result = await agent.run(prompt)
+        result = await chat.run(prompt)
         return SummaryResult(success=True, summary=result.text)
     except Exception:
         logger.exception("LLM summarization failed for '%s'", filename)

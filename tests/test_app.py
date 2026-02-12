@@ -12,7 +12,7 @@ from httpx import ASGITransport, AsyncClient
 import maf_onedrive_integration.app as app_module
 from maf_onedrive_integration.app import app
 from maf_onedrive_integration.onedrive.models import DriveItemInfo, SiteInfo
-from maf_onedrive_integration.summary_agent.agent import SummaryResult
+from maf_onedrive_integration.summarization_task.task import SummaryResult
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -521,7 +521,7 @@ class TestApiSummarize:
     @patch("maf_onedrive_integration.app.summarize_file_content")
     @patch("maf_onedrive_integration.app.OneDriveClient")
     @patch("maf_onedrive_integration.app.AuthorizationCodeCredential")
-    async def test_summary_agent_error_returns_422(
+    async def test_summarizer_error_returns_422(
         self,
         mock_cred_cls: MagicMock,
         mock_client_cls: MagicMock,

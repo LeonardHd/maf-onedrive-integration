@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from maf_onedrive_integration.onedrive.client import OneDriveClient
-from maf_onedrive_integration.summary_agent.agent import summarize_file_content
+from maf_onedrive_integration.summarization_task.task import summarize_file_content
 
 if TYPE_CHECKING:
     from starlette.responses import Response
